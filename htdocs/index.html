@@ -64,16 +64,18 @@ const M = Math,
 	W = window,
 	FA = Float32Array,
 	BLOOD = 28,
-	FLOOR = 1,
 	DUST = 2,
-	EDGE_TOP_LEFT = 112,
-	EDGE_TOP = 113,
-	EDGE_TOP_RIGHT = 114,
-	EDGE_LEFT = 128,
-	EDGE_RIGHT = 130,
-	EDGE_BOTTOM_LEFT = 144,
-	EDGE_BOTTOM = 145,
-	EDGE_BOTTOM_RIGHT = 146,
+	PLAYER = 3,
+	MAP_FLOOR1 = 0,
+	MAP_FLOOR2 = 1,
+	MAP_EDGE_TOP_LEFT = 112,
+	MAP_EDGE_TOP = 113,
+	MAP_EDGE_TOP_RIGHT = 114,
+	MAP_EDGE_LEFT = 128,
+	MAP_EDGE_RIGHT = 130,
+	MAP_EDGE_BOTTOM_LEFT = 144,
+	MAP_EDGE_BOTTOM = 145,
+	MAP_EDGE_BOTTOM_RIGHT = 146,
 	BTN_RIGHT = 192,
 	BTN_DOWN = 193,
 	BTN_STRIKE = 194
@@ -107,13 +109,15 @@ let atlas,
 	viewYMin,
 	viewYMax,
 	now,
-	gameOver = false,
+	gameOver = 0,
 	dust = [],
 	dustLength = 100,
+	dustLast = 0,
 	dustDuration = 500,
 	dustFrequency = 100,
 	blood = [],
 	bloodLength = 100,
+	bloodLast = 0,
 	bloodDuration = 500,
 	bloodFrequency = 100,
 	showTouchControls = false,
@@ -135,8 +139,6 @@ let atlas,
 	entitiesLength,
 	entities = [],
 	player
-
-M.TAU = M.TAU || M.PI * 2
 
 function drawSprite(sprite, x, y, xm, ym) {
 	gl.vertexAttribPointer(uvBufferLoc, 2, gl.FLOAT, gl.FALSE, 0, sprite << 5)
@@ -164,12 +166,13 @@ function drawBlood(viewX, viewY) {
 		const b = blood[i],
 			life = b.life
 		if (life > now) {
+			const size = 1 + (life - now) / bloodDuration
 			drawSprite(
 				BLOOD,
 				viewX + b.col * cellSize,
 				viewY - b.row * cellSize,
-				1,
-				1 + (life - now) / bloodDuration
+				size,
+				size
 			)
 			b.col += b.vx
 			b.row += b.vy
@@ -178,18 +181,14 @@ function drawBlood(viewX, viewY) {
 }
 
 function compareRow(a, b) {
-	if (a.row > b.row) {
-		return -1
-	} else if (a.row < b.row) {
-		return 1
-	}
-	return 0
+	return b.row - a.row
 }
 
 function drawEntities(viewX, viewY) {
 	entities.sort(compareRow)
 	for (let i = entitiesLength; i-- > 0;) {
 		const e = entities[i]
+		e.update && e.update()
 		e.draw(
 			viewX + e.col * cellSize,
 			viewY - e.row * cellSize
@@ -202,12 +201,13 @@ function drawDust(viewX, viewY) {
 		const d = dust[i],
 			life = d.life
 		if (life > now) {
+			const size = 1 + (life - now) / dustDuration
 			drawSprite(
 				DUST,
 				viewX + d.col * cellSize,
 				viewY - d.row * cellSize,
-				1,
-				1 + (life - now) / dustDuration
+				size,
+				size
 			)
 		}
 	}
@@ -256,42 +256,48 @@ function initFrame() {
 	gl.bindBuffer(gl.ARRAY_BUFFER, uvBuffer)
 }
 
-function spillBlood(col, row) {
-	let drops = 1
-	for (let i = 0; i < bloodLength; ++i) {
+function spillBlood(col, row, drops) {
+	drops = drops || 1
+	let i = bloodLast
+	do {
 		const b = blood[i]
 		if (b.life < now) {
 			b.col = col + (M.random() - .5) * .3
 			b.row = row + (M.random() - .5) * .3
 			b.vx = (M.random() - .5) * .1
 			b.vy = M.random() * .1
-			b.life = now + M.random() * bloodDuration
-			if (--drops < 0) {
+			b.life = now + bloodDuration
+			if (--drops < 1) {
+				bloodLast = i
 				break
 			}
 		}
-	}
+		i = ++i % bloodLength
+	} while (i != bloodLast)
 }
 
-function spawnDust(col, row) {
-	let specks = 1
-	for (let i = 0; i < dustLength; ++i) {
+function raiseDust(col, row, specks) {
+	specks = specks || 1
+	let i = dustLast
+	do {
 		const d = dust[i]
 		if (d.life < now) {
 			d.col = col + (M.random() - .5) * .3
 			d.row = row + (M.random() - .5) * .3
-			d.life = now + M.random() * dustDuration
-			if (--specks < 0) {
+			d.life = now + dustDuration
+			if (--specks < 1) {
+				dustLast = i
 				break
 			}
 		}
-	}
+		i = ++i % dustLength
+	} while (i != dustLast)
 }
 
-function spawnDustFor(e) {
+function raiseDustFor(e) {
 	if (e.dustUntil < now) {
 		e.dustUntil = now + dustFrequency
-		spawnDust(e.col, e.row)
+		raiseDust(e.col, e.row)
 	}
 }
 
@@ -300,7 +306,7 @@ function clampPosition(entity) {
 	entity.row = M.max(0, M.min(mapRows - 1, entity.row))
 }
 
-function strike(agent) {
+function fire(agent) {
 }
 
 function canMoveTo(entity, col, row) {
@@ -310,7 +316,7 @@ function canMoveTo(entity, col, row) {
 	}
 	for (let i = entitiesLength; i-- > 0;) {
 		const e = entities[i]
-		if (e === entity || !e.alive || e.herder !== null) {
+		if (e === entity || !e.alive) {
 			continue
 		}
 		const dc = e.col - col,
@@ -321,7 +327,8 @@ function canMoveTo(entity, col, row) {
 		}
 	}
 	switch (map[M.round(row) * mapCols + M.round(col)]) {
-	case FLOOR:
+	case MAP_FLOOR1:
+	case MAP_FLOOR2:
 		return true
 	default:
 		return false
@@ -329,7 +336,7 @@ function canMoveTo(entity, col, row) {
 }
 
 function moveBy(e, dc, dr) {
-	const col = e.col + dc,
+	let col = e.col + dc,
 		row = e.row + dr
 	if (!canMoveTo(e, col, row)) {
 		col = e.col - M.random() * .2 * dc
@@ -339,31 +346,7 @@ function moveBy(e, dc, dr) {
 	e.row = row
 	e.vc = dc
 	e.vr = dr
-	if (e.lamb && e.lamb.alive) {
-		const l = e.lamb,
-			dx = col - l.col,
-			dy = row - l.row,
-			d = dx*dx + dy*dy
-		if (d > 1) {
-			l.col += dx * .015
-			l.row += dy * .015
-			l.vc = dx
-			l.vr = dy
-			spawnDustFor(l)
-		}
-	}
-	spawnDustFor(e)
-	return true
-}
-
-function updateEntities() {
-	if (gameOver) {
-		return
-	}
-	for (let i = entitiesLength; i-- > 0;) {
-		const e = entities[i]
-		e.update && e.update()
-	}
+	raiseDustFor(e)
 }
 
 function inBtn(bx, by, x, y) {
@@ -374,7 +357,7 @@ function input() {
 	if (gameOver) {
 		return
 	}
-	const step = .05
+	const step = .1
 	let c = 0,
 		r = 0
 	for (let i = 0; i < pointersLength; ++i) {
@@ -391,7 +374,7 @@ function input() {
 			r = step
 		}
 		if (inBtn(btnStrikeX, btnStrikeY, px, py)) {
-			strike(player)
+			fire(player)
 		}
 	}
 	if (keysDown[37] || keysDown[72]) {
@@ -410,7 +393,7 @@ function input() {
 		moveBy(player, c, r)
 	}
 	if (keysDown[32]) {
-		strike(player)
+		fire(player)
 	}
 }
 
@@ -426,15 +409,14 @@ function run() {
 	now = Date.now()
 	resetMovement()
 	input()
-	updateEntities()
 	initFrame()
 	draw()
 }
 
 function reset() {
 	gameOver = 0
-	entitiesLength = 0
-	initEntities()
+	createMap()
+	createEntities()
 }
 
 function resetIfOver() {
@@ -593,39 +575,52 @@ function setDir(entity) {
 	}
 }
 
-function initEntities() {
-	entities = []
-	entitiesLength = entities.length
-	// DEBUG
-	player = {
-		col: mapCols * .5,
-		row: mapRows * .5
-	}
+function drawPlayer(x, y) {
+	drawSprite(PLAYER, x, y, this.dir)
 }
 
-function initMap() {
-	mapCols = mapRows = 31
+function createEntities() {
+	entities = []
+
+	entities.push(player = {
+		alive: true,
+		draw: drawPlayer,
+		dustUntil: 0,
+		col: mapCols * .5,
+		row: mapRows * .5,
+		vc: 0,
+		vr: 0
+	})
+
+	entitiesLength = entities.length
+}
+
+function createMap(cols, rows) {
+	const def = 31
+	mapCols = cols || def
+	mapRows = rows || def
+	map = []
 	for (let i = mapCols * mapRows; i--;) {
-		map[i] = FLOOR
+		map[i] = i % 2 ? MAP_FLOOR1 : MAP_FLOOR2
 	}
 	const lc = mapCols - 1,
 		lr = mapRows - 1
-	map[0] = EDGE_TOP_LEFT
-	map[lc] = EDGE_TOP_RIGHT
-	map[lr * mapCols] = EDGE_BOTTOM_LEFT
-	map[lr * mapCols + lc] = EDGE_BOTTOM_RIGHT
+	map[0] = MAP_EDGE_TOP_LEFT
+	map[lc] = MAP_EDGE_TOP_RIGHT
+	map[lr * mapCols] = MAP_EDGE_BOTTOM_LEFT
+	map[lr * mapCols + lc] = MAP_EDGE_BOTTOM_RIGHT
 	for (let x = 1, b = mapCols * lr; x < lc; ++x) {
-		map[x] = EDGE_TOP
-		map[b + x] = EDGE_BOTTOM
+		map[x] = MAP_EDGE_TOP
+		map[b + x] = MAP_EDGE_BOTTOM
 	}
 	for (let y = 1; y < lr; ++y) {
 		const x = y * mapCols
-		map[x] = EDGE_LEFT
-		map[x + lc] = EDGE_RIGHT
+		map[x] = MAP_EDGE_LEFT
+		map[x + lc] = MAP_EDGE_RIGHT
 	}
 }
 
-function initBlood() {
+function createBlood() {
 	for (let i = bloodLength; i-- > 0;) {
 		blood[i] = {
 			col: 0,
@@ -637,7 +632,7 @@ function initBlood() {
 	}
 }
 
-function initDust() {
+function createDust() {
 	for (let i = dustLength; i-- > 0;) {
 		dust[i] = {
 			col: 0,
@@ -685,7 +680,7 @@ function calcUvCoords() {
 	return coords
 }
 
-function initBuffers(program) {
+function createBuffers(program) {
 	vertexBuffer = gl.createBuffer()
 	gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer)
 	gl.bufferData(gl.ARRAY_BUFFER,
@@ -749,17 +744,16 @@ function init() {
 	gl.linkProgram(program)
 	gl.useProgram(program)
 
-	initBuffers(program)
+	createBuffers(program)
 
 	gl.enable(gl.BLEND)
 	gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
 	gl.clearColor(.101, .223, .364, 1)
 
 	wireInputs()
-	initDust()
-	initBlood()
-	initMap()
-	initEntities()
+	createDust()
+	createBlood()
+	reset()
 
 	W.onresize = resize
 	resize()
