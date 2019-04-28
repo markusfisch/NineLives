@@ -194,7 +194,6 @@ function drawEntities(viewX, viewY) {
 			let p = 1 - ((moveUntil - now) / moveDuration)
 			e.col += (e.colDest - e.col) * p
 			e.row += (e.rowDest - e.row) * p
-			raiseDustFor(e)
 		}
 		e.update && e.update()
 		e.draw(
@@ -361,6 +360,7 @@ function moveBy(e, dc, dr) {
 	e.vc = dc
 	e.vr = dr
 	e.moveUntil = now + moveDuration
+	raiseDustFor(e)
 }
 
 function inBtn(bx, by, x, y) {
