@@ -68,14 +68,7 @@ const M = Math,
 	PLAYER = 4,
 	MAP_FLOOR1 = 0,
 	MAP_FLOOR2 = 1,
-	MAP_EDGE_TOP_LEFT = 112,
-	MAP_EDGE_TOP = 113,
-	MAP_EDGE_TOP_RIGHT = 114,
-	MAP_EDGE_LEFT = 128,
-	MAP_EDGE_RIGHT = 130,
-	MAP_EDGE_BOTTOM_LEFT = 144,
-	MAP_EDGE_BOTTOM = 145,
-	MAP_EDGE_BOTTOM_RIGHT = 146,
+	MAP_WALL = 2,
 	BTN_RIGHT = 192,
 	BTN_DOWN = 193,
 	BTN_STRIKE = 194
@@ -587,17 +580,17 @@ function drawPlayer(x, y) {
 	drawSprite(PLAYER, x, y, this.dir)
 }
 
-function createEntities(start) {
+function createEntities(setup) {
 	entities = []
 
 	entities.push(player = {
 		alive: true,
 		draw: drawPlayer,
 		dustUntil: 0,
-		col: start.x,
-		row: start.y,
-		colDest: start.x,
-		rowDest: start.y,
+		col: setup.col,
+		row: setup.row,
+		colDest: setup.col,
+		rowDest: setup.row,
 		vc: 0,
 		vr: 0
 	})
@@ -605,27 +598,28 @@ function createEntities(start) {
 	entitiesLength = entities.length
 }
 
-function createMap(cols, rows) {
-	mapCols = cols
-	mapRows = rows
+function createMap(cols, rows, padCols, padRows) {
+	mapCols = cols + padCols
+	mapRows = rows + padRows
 	map = []
-	for (let i = mapCols * mapRows; i--;) {
-		map[i] = i % 2 ? MAP_FLOOR1 : MAP_FLOOR2
-	}
-	const lc = mapCols - 1,
-		lr = mapRows - 1
-	map[0] = MAP_EDGE_TOP_LEFT
-	map[lc] = MAP_EDGE_TOP_RIGHT
-	map[lr * mapCols] = MAP_EDGE_BOTTOM_LEFT
-	map[lr * mapCols + lc] = MAP_EDGE_BOTTOM_RIGHT
-	for (let x = 1, b = mapCols * lr; x < lc; ++x) {
-		map[x] = MAP_EDGE_TOP
-		map[b + x] = MAP_EDGE_BOTTOM
-	}
-	for (let y = 1; y < lr; ++y) {
-		const x = y * mapCols
-		map[x] = MAP_EDGE_LEFT
-		map[x + lc] = MAP_EDGE_RIGHT
+	const l = M.floor(padCols / 2),
+		t = M.floor(padRows / 2),
+		r = l + cols,
+		b = t + rows
+	let offset = 0,
+		checker = 0,
+		checkerAdd = cols % 2 ? 0 : 1
+	for (let row = 0; row < mapRows; ++row) {
+		for (let col = 0; col < mapCols; ++col) {
+			let tile
+			if (col >= l && col < r && row >= t && row < b) {
+				tile = checker++ % 2 ? MAP_FLOOR1 : MAP_FLOOR2
+			} else {
+				tile = MAP_WALL
+			}
+			map[offset++] = tile
+		}
+		checker += checkerAdd
 	}
 }
 
@@ -641,22 +635,24 @@ function createMapForPath(path) {
 		maxX = M.max(maxX, p.x)
 		maxY = M.max(maxY, p.y)
 	}
-	const w = maxX - minX + 1,
-		h = maxY - minY + 1,
-		minSize = 7,//21,
-		padx = M.max(minSize - w, 0) + 2,
-		pady = M.max(minSize - h, 0) + 2
-	createMap(w + padx, h + pady)
-	const ox = M.floor((mapCols - w) / 2) + M.abs(minX),
-		oy = M.floor((mapRows - h) / 2) + M.abs(minY)
+	const cols = maxX - minX + 1,
+		rows = maxY - minY + 1,
+		minSize = 21
+	createMap(
+		cols,
+		rows,
+		M.max(minSize - cols, 0) + 2,
+		M.max(minSize - rows, 0) + 2
+	)
+	const oc = M.floor((mapCols - cols) / 2) + M.abs(minX),
+		or = M.floor((mapRows - rows) / 2) + M.abs(minY)
 	for (let i = 0, l = path.length; i < l; ++i) {
-		const p = path[i],
-			o = (oy + p.y) * mapCols + p.x + ox
-		map[o] = 16 + i
+		const p = path[i]
+		map[(or + p.y) * mapCols + p.x + oc] = 16 + i
 	}
 	return {
-		x: ox,
-		y: oy
+		col: oc,
+		row: or
 	}
 }
 
