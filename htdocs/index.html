@@ -120,6 +120,7 @@ let atlas,
 	bloodLast = 0,
 	bloodDuration = 500,
 	bloodFrequency = 100,
+	moveDuration = 300,
 	showTouchControls = false,
 	btnLeftX,
 	btnLeftY,
@@ -187,7 +188,14 @@ function compareRow(a, b) {
 function drawEntities(viewX, viewY) {
 	entities.sort(compareRow)
 	for (let i = entitiesLength; i-- > 0;) {
-		const e = entities[i]
+		const e = entities[i],
+			moveUntil = e.moveUntil
+		if (moveUntil > now) {
+			let p = 1 - ((moveUntil - now) / moveDuration)
+			e.col += (e.colDest - e.col) * p
+			e.row += (e.rowDest - e.row) * p
+			raiseDustFor(e)
+		}
 		e.update && e.update()
 		e.draw(
 			viewX + e.col * cellSize,
@@ -301,9 +309,16 @@ function raiseDustFor(e) {
 	}
 }
 
-function clampPosition(entity) {
-	entity.col = M.max(0, M.min(mapCols - 1, entity.col))
-	entity.row = M.max(0, M.min(mapRows - 1, entity.row))
+function reset() {
+	gameOver = 0
+	createMap()
+	createEntities()
+}
+
+function resetIfOver() {
+	if (gameOver && now - gameOver > 1000) {
+		reset()
+	}
 }
 
 function fire(agent) {
@@ -336,63 +351,68 @@ function canMoveTo(entity, col, row) {
 }
 
 function moveBy(e, dc, dr) {
-	let col = e.col + dc,
-		row = e.row + dr
+	let col = e.colDest + dc,
+		row = e.rowDest + dr
 	if (!canMoveTo(e, col, row)) {
-		col = e.col - M.random() * .2 * dc
-		row = e.row - M.random() * .2 * dr
+		return
 	}
-	e.col = col
-	e.row = row
+	e.colDest = col
+	e.rowDest = row
 	e.vc = dc
 	e.vr = dr
-	raiseDustFor(e)
+	e.moveUntil = now + moveDuration
 }
 
 function inBtn(bx, by, x, y) {
 	return M.abs(bx - x) < btnSize && M.abs(by - y) < btnSize
 }
 
-function input() {
+function processInput() {
 	if (gameOver) {
 		return
 	}
-	const step = .1
-	let c = 0,
-		r = 0
-	for (let i = 0; i < pointersLength; ++i) {
-		const px = pointersX[i],
-			py = pointersY[i]
-		if (inBtn(btnLeftX, btnLeftY, px, py)) {
-			c = -step
-		} else if (inBtn(btnRightX, btnRightY, px, py)) {
-			c = step
+	let col = 0,
+		row = 0,
+		attack = false
+	if (showTouchControls) {
+		for (let i = 0; i < pointersLength; ++i) {
+			const px = pointersX[i],
+				py = pointersY[i]
+			if (inBtn(btnLeftX, btnLeftY, px, py)) {
+				col = -1
+			} else if (inBtn(btnRightX, btnRightY, px, py)) {
+				col = 1
+			}
+			if (inBtn(btnUpX, btnUpY, px, py)) {
+				row = -1
+			} else if (inBtn(btnDownX, btnDownY, px, py)) {
+				row = 1
+			}
+			if (inBtn(btnStrikeX, btnStrikeY, px, py)) {
+				attack = true
+			}
 		}
-		if (inBtn(btnUpX, btnUpY, px, py)) {
-			r = -step
-		} else if (inBtn(btnDownX, btnDownY, px, py)) {
-			r = step
+	} else {
+		if (keysDown[37] || keysDown[72]) {
+			col = -1
 		}
-		if (inBtn(btnStrikeX, btnStrikeY, px, py)) {
-			fire(player)
+		if (keysDown[39] || keysDown[76]) {
+			col = 1
+		}
+		if (keysDown[38] || keysDown[75]) {
+			row = -1
+		}
+		if (keysDown[40] || keysDown[74]) {
+			row = 1
+		}
+		if (keysDown[32]) {
+			attack = true
 		}
 	}
-	if (keysDown[37] || keysDown[72]) {
-		c = -step
+	if (col !== 0 || row !== 0) {
+		moveBy(player, col, row)
 	}
-	if (keysDown[39] || keysDown[76]) {
-		c = step
-	}
-	if (keysDown[38] || keysDown[75]) {
-		r = -step
-	}
-	if (keysDown[40] || keysDown[74]) {
-		r = step
-	}
-	if (c !== 0 || r !== 0) {
-		moveBy(player, c, r)
-	}
-	if (keysDown[32]) {
+	if (attack) {
 		fire(player)
 	}
 }
@@ -408,21 +428,8 @@ function run() {
 	requestAnimationFrame(run)
 	now = Date.now()
 	resetMovement()
-	input()
 	initFrame()
 	draw()
-}
-
-function reset() {
-	gameOver = 0
-	createMap()
-	createEntities()
-}
-
-function resetIfOver() {
-	if (gameOver && now - gameOver > 1000) {
-		reset()
-	}
 }
 
 function pageXToGl(x) {
@@ -457,10 +464,11 @@ function pointerCancel(event) {
 }
 
 function pointerUp(event) {
-	setPointer(event, false)
 	if (showTouchControls) {
+		processInput()
 		resetIfOver()
 	}
+	setPointer(event, false)
 }
 
 function pointerMove(event) {
@@ -483,6 +491,7 @@ function keyUp(event) {
 
 function keyDown(event) {
 	setKey(event, true)
+	processInput()
 }
 
 function wireInputs() {
@@ -582,12 +591,16 @@ function drawPlayer(x, y) {
 function createEntities() {
 	entities = []
 
+	let c = M.round(mapCols * .5),
+		r = M.round(mapRows * .5)
 	entities.push(player = {
 		alive: true,
 		draw: drawPlayer,
 		dustUntil: 0,
-		col: mapCols * .5,
-		row: mapRows * .5,
+		col: c,
+		row: r,
+		colDest: c,
+		rowDest: r,
 		vc: 0,
 		vr: 0
 	})
