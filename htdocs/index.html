@@ -359,10 +359,6 @@ function resetEntity(e, col, row) {
 function reset() {
 	clearTimeout(resetTimeout)
 	resetTimeout = 0
-	if (lives < 1) {
-		return
-	}
-	gameOver = 0
 	let newLevel = true
 	if (gameOverReason) {
 		switch (gameOverReason) {
@@ -377,6 +373,10 @@ function reset() {
 		}
 		gameOverReason = 0
 	}
+	if (lives < 1) {
+		return
+	}
+	gameOver = 0
 	if (newLevel) {
 		level.setup = createMapForPath(createPath(level.pathLen))
 		createEntities(level.setup)
@@ -501,7 +501,7 @@ function processInput() {
 }
 
 function run() {
-	lives > -1 && requestAnimationFrame(run)
+	lives > 0 && requestAnimationFrame(run)
 	now = Date.now()
 	initFrame()
 	draw()
