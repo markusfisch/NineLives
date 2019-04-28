@@ -112,6 +112,7 @@ let atlas,
 	now,
 	gameOver = 0,
 	gameOverReason = 0,
+	seed = M.PI,
 	lives = 9,
 	level = {},
 	levelLen = 7,
@@ -887,6 +888,11 @@ function invalid(points, x, y) {
 	return neigbors > 2
 }
 
+function random() {
+	// from http://indiegamr.com/generate-repeatable-random-numbers-in-js/
+	return (seed = (seed * 9301 + 49297) % 233280) / 233280
+}
+
 function createPath(len) {
 	const path = [{
 		x: 0,
@@ -898,7 +904,7 @@ function createPath(len) {
 		do {
 			x = p.x
 			y = p.y
-			const r = M.random()
+			const r = random()
 			if (r < .25) {
 				--y
 			} else if (r < .5) {
