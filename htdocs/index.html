@@ -67,8 +67,8 @@ const M = Math,
 	DUST = 5,
 	PLAYER = 4,
 	HEART = 3,
-	LIFE = 16,
-	LIFE_HALF = 17,
+	LIFE = 48,
+	LIFE_HALF = 49,
 	TILE_FLOOR1 = 0,
 	TILE_FLOOR2 = 1,
 	TILE_WALL = 2,
@@ -98,6 +98,7 @@ let atlas,
 	yMax,
 	spriteRad,
 	cellSize,
+	charSize,
 	maxColsInView,
 	maxRowsInView,
 	map = [],
@@ -144,6 +145,9 @@ let atlas,
 	lifeX,
 	lifeY,
 	lifeSize,
+	message,
+	messageY,
+	messageUntil = 0,
 	resetTimeout,
 	pointersLength,
 	pointersX = [],
@@ -172,6 +176,37 @@ function drawTouchControls() {
 	drawSprite(BTN_DOWN, btnUpX, btnUpY, 1, -1)
 	drawSprite(BTN_DOWN, btnDownX, btnDownY)
 	drawSprite(BTN_PEEK, btnPeekX, btnPeekY)
+}
+
+function drawText(text, x, y) {
+	for (let i = 0, len = text.length; i < len; ++i) {
+		const c = text.charCodeAt(i)
+		if (c == 32) {
+			drawSprite(32, x, y)
+			x += charSize
+		} else {
+			drawSprite(c, x, y)
+			x += charSize
+		}
+	}
+}
+
+function measureText(text) {
+	let width = 0
+	for (let i = 0, len = text.length; i < len; ++i) {
+		width += charSize
+	}
+	return width
+}
+
+function drawTextCentered(text, y) {
+	drawText(text, measureText(text) * -.5, y)
+}
+
+function drawMessage() {
+	if (messageUntil > now) {
+		drawTextCentered(message, messageY)
+	}
 }
 
 function drawLives() {
@@ -291,6 +326,7 @@ function draw() {
 	drawEntities(viewX, viewY)
 	drawBlood(viewX, viewY)
 	drawLives()
+	drawMessage()
 	showTouchControls && drawTouchControls()
 }
 
@@ -354,6 +390,11 @@ function raiseDustFor(e) {
 	}
 }
 
+function setMessage(text, until) {
+	message = text
+	messageUntil = until || now + 2000
+}
+
 function resetEntity(e, col, row) {
 	e.alive = true
 	e.col = e.colDest = col
@@ -381,8 +422,10 @@ function reset() {
 		gameOverReason = 0
 	}
 	if (lives <= 0) {
+		setMessage("YOU LOST", now + now)
 		return
 	}
+	messageUntil = 0
 	gameOver = 0
 	if (newLevel) {
 		level.setup = createMapForPath(createPath(level.pathLen))
@@ -406,6 +449,7 @@ function endGame(reason) {
 	if (reason == FAIL) {
 		player.alive = false
 		spillBlood(player.col, player.row)
+		setMessage("TRY AGAIN")
 	}
 	shake()
 	gameOver = now
@@ -657,6 +701,7 @@ function resize() {
 	gl.viewport(0, 0, width, height)
 
 	spriteRad = M.min(1, yMax) * .1
+	charSize = spriteRad * .6
 	cellSize = spriteRad * 2
 
 	maxColsInView = (2 / cellSize | 0) + 2
@@ -696,7 +741,9 @@ function resize() {
 	const lifeMargin = spriteRad
 	lifeX = -1 + lifeMargin
 	lifeY = yMax - lifeMargin
-	lifeSize = btnSize
+	lifeSize = spriteRad
+
+	messageY = yMax - spriteRad * 3
 }
 
 function setDir(entity) {
