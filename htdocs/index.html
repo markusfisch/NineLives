@@ -121,6 +121,10 @@ let atlas,
 	bloodFrequency = 100,
 	moveDuration = 300,
 	liveDuration = 500,
+	shakeUntil = 0,
+	shakePattern = [.1, .4, .7, .3, .5, .2],
+	shakeLength = shakePattern.length,
+	shakeDuration = 300,
 	showTouchControls = false,
 	btnLeftX,
 	btnLeftY,
@@ -209,8 +213,11 @@ function compareRow(a, b) {
 function drawEntities(viewX, viewY) {
 	entities.sort(compareRow)
 	for (let i = entitiesLength; i-- > 0;) {
-		const e = entities[i],
-			moveUntil = e.moveUntil
+		const e = entities[i]
+		if (!e.alive) {
+			continue
+		}
+		const moveUntil = e.moveUntil
 		if (moveUntil > now) {
 			let p = 1 - ((moveUntil - now) / moveDuration)
 			e.col += (e.colDest - e.col) * p
@@ -262,6 +269,16 @@ function draw() {
 		viewY = player.row * cellSize
 	viewX = M.min(M.max(viewX, viewXMax), viewXMin)
 	viewY = M.min(M.max(viewY, viewYMin), viewYMax)
+
+	let shakeX = 0, shakeY = 0
+	if (shakeUntil > now) {
+		let p = (shakeUntil - now) / shakeDuration * .05
+		shakeX = shakePattern[(now + 1) % shakeLength] * p
+		shakeY = shakePattern[now % shakeLength] * p
+	}
+	viewX += shakeX
+	viewY += shakeY
+
 	drawMap(viewX, viewY)
 	drawDust(viewX, viewY)
 	drawEntities(viewX, viewY)
@@ -331,6 +348,7 @@ function raiseDustFor(e) {
 }
 
 function resetEntity(e, col, row) {
+	e.alive = true
 	e.col = e.colDest = col
 	e.row = e.rowDest = row
 	e.vc = 0
@@ -377,6 +395,23 @@ function resetIfOver() {
 	}
 }
 
+function shake() {
+	shakeUntil = now + shakeDuration
+}
+
+function endGame(reason) {
+	if (reason == FAIL) {
+		player.alive = false
+		spillBlood(player.col, player.row, 7)
+	}
+	shake()
+	gameOver = now
+	gameOverReason = reason
+	resetTimeout = setTimeout(function() {
+		reset()
+	}, 1000)
+}
+
 function offset(col, row) {
 	return M.round(row) * mapCols + M.round(col)
 }
@@ -407,14 +442,6 @@ function canMoveTo(entity, col, row) {
 	}
 }
 
-function die(reason) {
-	gameOver = now
-	gameOverReason = reason
-	resetTimeout = setTimeout(function() {
-		reset()
-	}, 2000)
-}
-
 function moveBy(e, dc, dr) {
 	let col = e.colDest + dc,
 		row = e.rowDest + dr
@@ -429,7 +456,7 @@ function moveBy(e, dc, dr) {
 	raiseDustFor(e)
 	const trap = trapMap[offset(col, row)]
 	if (trap) {
-		die(trap)
+		endGame(trap)
 	}
 }
 
@@ -654,6 +681,7 @@ function createEntities(setup) {
 	entities = []
 
 	entities.push(player = {
+		alive: true,
 		blocks: true,
 		draw: drawPlayer,
 		dustUntil: 0,
@@ -666,6 +694,7 @@ function createEntities(setup) {
 	})
 
 	entities.push({
+		alive: true,
 		blocks: false,
 		draw: drawImmovable,
 		col: setup.endCol,
