@@ -114,6 +114,7 @@ let atlas,
 	gameOverReason = 0,
 	lives = 9,
 	level = { pathLen: 7 },
+	levelNumber = 1,
 	dust = [],
 	dustLength = 100,
 	dustLast = 0,
@@ -146,8 +147,11 @@ let atlas,
 	lifeY,
 	lifeSize,
 	message,
+	messageX,
 	messageY,
 	messageUntil = 0,
+	levelX,
+	levelY,
 	resetTimeout,
 	pointersLength,
 	pointersX = [],
@@ -205,9 +209,9 @@ function drawTextCentered(text, y) {
 
 function drawMessage() {
 	if (messageUntil > now) {
-		drawTextCentered(message, messageY)
+		drawText(message, messageX, messageY)
 	}
-}
+	drawText("LEVEL " + levelNumber, levelX, levelY)
 
 function drawLives() {
 	let x = lifeX
@@ -417,6 +421,7 @@ function reset() {
 		case WON:
 			++lives
 			++level.pathLen
+			++levelNumber
 			break
 		}
 		gameOverReason = 0
@@ -743,7 +748,10 @@ function resize() {
 	lifeY = yMax - lifeMargin
 	lifeSize = spriteRad
 
-	messageY = yMax - spriteRad * 3
+	messageX = -1 + lifeMargin
+	messageY = yMax - spriteRad * 3.6
+	levelX = messageX
+	levelY = yMax - spriteRad * 2.3
 }
 
 function setDir(entity) {
