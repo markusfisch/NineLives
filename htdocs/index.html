@@ -108,7 +108,8 @@ let atlas,
 	now,
 	gameOver = 0,
 	gameOverReason = 0,
-	level = {},
+	lives = 9,
+	level = { pathLen: 7 },
 	dust = [],
 	dustLength = 100,
 	dustLast = 0,
@@ -168,7 +169,6 @@ function drawTouchControls() {
 }
 
 function drawLives() {
-	const lives = level.lives
 	let x = lifeX
 	for (let i = 0, l = lives - 1; i < l; ++i, x += lifeSize) {
 		drawSprite(LIFE, x, lifeY)
@@ -359,27 +359,23 @@ function resetEntity(e, col, row) {
 function reset() {
 	clearTimeout(resetTimeout)
 	resetTimeout = 0
+	if (lives < 1) {
+		return
+	}
 	gameOver = 0
 	let newLevel = true
 	if (gameOverReason) {
 		switch (gameOverReason) {
 		case FAIL:
-			--level.lives
+			--lives
 			newLevel = false
 			break
 		case WON:
-			++level.lives
+			++lives
 			++level.pathLen
 			break
 		}
 		gameOverReason = 0
-	}
-	if (!level.lives || level.lives < 1) {
-		newLevel = true
-		level = {
-			lives: 9,
-			pathLen: 7
-		}
 	}
 	if (newLevel) {
 		level.setup = createMapForPath(createPath(level.pathLen))
@@ -505,7 +501,7 @@ function processInput() {
 }
 
 function run() {
-	requestAnimationFrame(run)
+	lives > -1 && requestAnimationFrame(run)
 	now = Date.now()
 	initFrame()
 	draw()
