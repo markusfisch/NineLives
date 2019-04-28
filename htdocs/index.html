@@ -68,11 +68,14 @@ const M = Math,
 	PLAYER = 4,
 	HEART = 3,
 	LIFE = 16,
+	LIFE_HALF = 17,
 	TILE_FLOOR1 = 0,
 	TILE_FLOOR2 = 1,
 	TILE_WALL = 2,
-	BTN_RIGHT = 192,
-	BTN_DOWN = 193,
+	TILE_DANGER = 13,
+	BTN_RIGHT = 14,
+	BTN_DOWN = 15,
+	BTN_PEEK = 13,
 	FAIL = 1,
 	WON = 2
 
@@ -135,6 +138,8 @@ let atlas,
 	btnUpY,
 	btnDownX,
 	btnDownY,
+	btnPeekX,
+	btnPeekY,
 	btnSize,
 	lifeX,
 	lifeY,
@@ -166,11 +171,12 @@ function drawTouchControls() {
 	drawSprite(BTN_RIGHT, btnRightX, btnRightY)
 	drawSprite(BTN_DOWN, btnUpX, btnUpY, 1, -1)
 	drawSprite(BTN_DOWN, btnDownX, btnDownY)
+	drawSprite(BTN_PEEK, btnPeekX, btnPeekY)
 }
 
 function drawLives() {
 	let x = lifeX
-	for (let i = 0, l = lives - 1; i < l; ++i, x += lifeSize) {
+	for (let i = 0, l = M.ceil(lives) - 1; i < l; ++i, x += lifeSize) {
 		drawSprite(LIFE, x, lifeY)
 	}
 	if (lives > 0) {
@@ -183,7 +189,8 @@ function drawLives() {
 				return
 			}
 		}
-		drawSprite(LIFE, x, lifeY, s, s)
+		drawSprite(M.floor(lives) == lives ? LIFE : LIFE_HALF,
+			x, lifeY, s, s)
 	}
 }
 
@@ -303,7 +310,7 @@ function initFrame() {
 }
 
 function spillBlood(col, row, drops) {
-	drops = drops || 1
+	drops = drops || 3
 	let i = bloodLast
 	do {
 		const b = blood[i]
@@ -373,7 +380,7 @@ function reset() {
 		}
 		gameOverReason = 0
 	}
-	if (lives < 1) {
+	if (lives <= 0) {
 		return
 	}
 	gameOver = 0
@@ -398,7 +405,7 @@ function shake() {
 function endGame(reason) {
 	if (reason == FAIL) {
 		player.alive = false
-		spillBlood(player.col, player.row, 7)
+		spillBlood(player.col, player.row)
 	}
 	shake()
 	gameOver = now
@@ -410,6 +417,24 @@ function endGame(reason) {
 
 function offset(col, row) {
 	return M.round(row) * mapCols + M.round(col)
+}
+
+function peekAt(col, row) {
+	const p = [
+		col - 1, row,
+		col + 1, row,
+		col, row - 1,
+		col, row + 1,
+	]
+	for (let i = 0; i < 8;) {
+		const c = p[i++],
+			r = p[i++],
+			o = offset(c, r)
+		if (trapMap[o] == FAIL) {
+			map[o] = TILE_DANGER
+			raiseDust(c, r)
+		}
+	}
 }
 
 function canMoveTo(entity, col, row) {
@@ -465,7 +490,8 @@ function processInput() {
 		return
 	}
 	let col = 0,
-		row = 0
+		row = 0,
+		peek = false
 	if (showTouchControls) {
 		for (let i = 0; i < pointersLength; ++i) {
 			const px = pointersX[i],
@@ -479,6 +505,9 @@ function processInput() {
 				row = -1
 			} else if (inBtn(btnDownX, btnDownY, px, py)) {
 				row = 1
+			}
+			if (inBtn(btnPeekX, btnPeekY, px, py)) {
+				peek = true
 			}
 		}
 	} else {
@@ -494,14 +523,27 @@ function processInput() {
 		if (keysDown[40] || keysDown[74]) {
 			row = 1
 		}
+		if (keysDown[32]) {
+			peek = true
+		}
 	}
 	if (col !== 0 || row !== 0) {
 		moveBy(player, col, row)
 	}
+	if (peek) {
+		const pc = player.col,
+			pr = player.row
+		peekAt(pc, pr)
+		spillBlood(pc, pr)
+		lives -= .5
+		if (lives <= 0) {
+			endGame(FAIL)
+		}
+	}
 }
 
 function run() {
-	lives > 0 && requestAnimationFrame(run)
+	requestAnimationFrame(run)
 	now = Date.now()
 	initFrame()
 	draw()
@@ -645,6 +687,8 @@ function resize() {
 	btnUpY = -yMax + btnMargin * 3
 	btnDownX = btnUpX
 	btnDownY = -yMax + btnMargin
+	btnPeekX = -1 + btnMargin * 1.5
+	btnPeekY = -yMax + btnMargin * 2
 	btnSize = spriteRad * 2
 
 	const lifeMargin = spriteRad
@@ -714,14 +758,16 @@ function createMap(cols, rows, padCols, padRows) {
 		checkerAdd = cols % 2 ? 0 : 1
 	for (let row = 0; row < mapRows; ++row) {
 		for (let col = 0; col < mapCols; ++col, ++offset) {
-			let tile
+			let tile, trap
 			if (col >= l && col < r && row >= t && row < b) {
 				tile = checker++ % 2 ? TILE_FLOOR1 : TILE_FLOOR2
+				trap = FAIL
 			} else {
 				tile = TILE_WALL
+				trap = 0
 			}
 			map[offset] = tile
-			trapMap[offset] = FAIL
+			trapMap[offset] = trap
 		}
 		checker += checkerAdd
 	}
