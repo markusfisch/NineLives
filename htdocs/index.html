@@ -7,7 +7,7 @@
 <style>
 html, body {
 	margin: 0; padding: 0;
-	background: #1a395d; color: #fff;
+	background: #5f270a; color: #fff;
 	font: 3vmin sans-serif;
 	-webkit-tap-highlight-color: rgba(0,0,0,0);
 	-webkit-touch-callout: none;
@@ -63,19 +63,22 @@ const M = Math,
 	D = document,
 	W = window,
 	FA = Float32Array,
-	BLOOD = 28,
-	DUST = 5,
-	PLAYER = 4,
-	HEART = 3,
-	LIFE = 48,
-	LIFE_HALF = 49,
-	TILE_FLOOR1 = 0,
-	TILE_FLOOR2 = 1,
-	TILE_WALL = 2,
-	TILE_DANGER = 13,
-	BTN_RIGHT = 14,
-	BTN_DOWN = 15,
-	BTN_PEEK = 13,
+	SPR_PLAYER1 = 0,
+	SPR_PLAYER2 = 1,
+	SPR_LIFE = 16,
+	SPR_LIFE_HALF = 17,
+	SPR_DANGER = 18,
+	SPR_BLADE1 = 19,
+	SPR_BLADE2 = 20,
+	SPR_DUST = 29,
+	SPR_BLOOD = 31,
+	TILE_FLOOR1 = 128,
+	TILE_FLOOR2 = 129,
+	TILE_WALL1 = 96,
+	TILE_WALL2 = 97,
+	BTN_RIGHT = 160,
+	BTN_DOWN = 161,
+	BTN_PEEK = 162,
 	FAIL = 1,
 	WON = 2
 
@@ -219,7 +222,7 @@ function drawMessage() {
 function drawLives() {
 	let x = lifeX
 	for (let i = 0, l = M.ceil(lives) - 1; i < l; ++i, x += lifeSize) {
-		drawSprite(LIFE, x, lifeY)
+		drawSprite(SPR_LIFE, x, lifeY)
 	}
 	if (lives > 0) {
 		let s = 1
@@ -231,8 +234,10 @@ function drawLives() {
 				return
 			}
 		}
-		drawSprite(M.floor(lives) == lives ? LIFE : LIFE_HALF,
-			x, lifeY, s, s)
+		drawSprite(
+			M.floor(lives) == lives ? SPR_LIFE : SPR_LIFE_HALF,
+			x, lifeY, s, s
+		)
 	}
 }
 
@@ -243,7 +248,7 @@ function drawBlood(viewX, viewY) {
 		if (life > now) {
 			const size = 1 + (life - now) / bloodDuration
 			drawSprite(
-				BLOOD,
+				SPR_BLOOD,
 				viewX + b.col * cellSize,
 				viewY - b.row * cellSize,
 				size,
@@ -287,7 +292,7 @@ function drawDust(viewX, viewY) {
 		if (life > now) {
 			const size = 1 + (life - now) / dustDuration
 			drawSprite(
-				DUST,
+				SPR_DUST,
 				viewX + d.col * cellSize,
 				viewY - d.row * cellSize,
 				size,
@@ -353,15 +358,15 @@ function initFrame() {
 }
 
 function spillBlood(col, row, drops) {
-	drops = drops || 3
+	drops = drops || 6
 	let i = bloodLast
 	do {
 		const b = blood[i]
 		if (b.life < now) {
 			b.col = col + (M.random() - .5) * .3
 			b.row = row + (M.random() - .5) * .3
-			b.vx = (M.random() - .5) * .1
-			b.vy = M.random() * .1
+			b.vx = (M.random() - .5) * .05
+			b.vy = M.random() * .05
 			b.life = now + bloodDuration
 			if (--drops < 1) {
 				bloodLast = i
@@ -430,7 +435,10 @@ function reset() {
 		gameOverReason = 0
 	}
 	if (lives <= 0) {
-		setMessage("YOU LOST", now + now)
+		setMessage("YOU LOST", now + 5000)
+		if (now - gameOver > 5000) {
+			W.location.reload(true)
+		}
 		return
 	}
 	messageUntil = 0
@@ -454,24 +462,47 @@ function shake() {
 }
 
 function endGame(reason) {
+	let ms = 500
 	if (reason == FAIL) {
 		player.alive = false
 		spillBlood(player.col, player.row)
 		setMessage("TRY AGAIN")
+		ms = 1000
 	}
 	shake()
 	gameOver = now
 	gameOverReason = reason
 	resetTimeout = setTimeout(function() {
 		reset()
-	}, 1000)
+	}, ms)
 }
 
 function offset(col, row) {
 	return M.round(row) * mapCols + M.round(col)
 }
 
+function addStaticEntity(col, row, draw) {
+	col = M.round(col)
+	row = M.round(row)
+	for (let i = 0; i < entitiesLength; ++i) {
+		const e = entities[i]
+		if (e.alive && e.col == col && e.row == row) {
+			return false
+		}
+	}
+	entities.push({
+		draw: draw,
+		alive: true,
+		blocks: true,
+		col: col,
+		row: row
+	})
+	entitiesLength = entities.length
+	return true
+}
+
 function peekAt(col, row) {
+	let reveal = false
 	const p = [
 		col - 1, row,
 		col + 1, row,
@@ -480,13 +511,14 @@ function peekAt(col, row) {
 	]
 	for (let i = 0; i < 8;) {
 		const c = p[i++],
-			r = p[i++],
-			o = offset(c, r)
-		if (trapMap[o] == FAIL) {
-			map[o] = TILE_DANGER
+			r = p[i++]
+		if (trapMap[offset(c, r)] == FAIL &&
+				addStaticEntity(c, r, drawDanger)) {
 			raiseDust(c, r)
+			reveal = true
 		}
 	}
+	return reveal
 }
 
 function canMoveTo(entity, col, row) {
@@ -527,11 +559,10 @@ function moveBy(e, dc, dr) {
 	e.vr = dr
 	e.moveUntil = now + moveDuration
 	raiseDustFor(e)
-	const o = offset(col, row),
-		trap = trapMap[o]
+	const trap = trapMap[offset(col, row)]
 	if (trap) {
 		if (trap == FAIL) {
-			map[o] = TILE_DANGER
+			addStaticEntity(col, row, drawBlade)
 		}
 		endGame(trap)
 	}
@@ -592,11 +623,12 @@ function processInput() {
 	if (peek) {
 		const pc = player.col,
 			pr = player.row
-		peekAt(pc, pr)
-		spillBlood(pc, pr)
-		lives -= .5
-		if (lives <= 0) {
-			endGame(FAIL)
+		if (peekAt(pc, pr)) {
+			spillBlood(pc, pr)
+			lives -= .5
+			if (lives <= 0) {
+				endGame(FAIL)
+			}
 		}
 	}
 }
@@ -754,12 +786,12 @@ function resize() {
 	const lifeMargin = spriteRad
 	lifeX = -1 + lifeMargin
 	lifeY = yMax - lifeMargin
-	lifeSize = spriteRad
+	lifeSize = spriteRad * 1.1
 
-	messageX = -1 + lifeMargin
-	messageY = yMax - spriteRad * 3.6
+	messageX = -1 + lifeMargin * .8
+	messageY = yMax - spriteRad * 4
 	levelX = messageX
-	levelY = yMax - spriteRad * 2.3
+	levelY = yMax - spriteRad * 2.6
 }
 
 function setDir(entity) {
@@ -771,15 +803,27 @@ function setDir(entity) {
 	}
 }
 
-function drawImmovable(x, y) {
-	drawSprite(HEART, x, y)
+function drawBlade(x, y) {
+	drawSprite(now % 800 > 400 ? SPR_BLADE1 : SPR_BLADE2, x, y)
+}
+
+function drawDanger(x, y) {
+	drawSprite(SPR_DANGER, x, y)
+}
+
+function drawHeart(x, y) {
+	gameOverReason != WON && drawSprite(SPR_LIFE, x, y)
 }
 
 function drawPlayer(x, y) {
-	drawSprite(PLAYER, x, y, this.dir, 1 + M.min(1, M.max(
-		M.abs(this.colDest - this.col),
-		M.abs(this.rowDest - this.row)
-	)))
+	drawSprite(
+		now % 1000 > 500 ? SPR_PLAYER2 : SPR_PLAYER1,
+		x, y,
+		this.dir, 1 + M.min(1, M.max(
+			M.abs(this.colDest - this.col),
+			M.abs(this.rowDest - this.row)
+		))
+	)
 }
 
 function createEntities(setup) {
@@ -801,7 +845,7 @@ function createEntities(setup) {
 	entities.push({
 		alive: true,
 		blocks: false,
-		draw: drawImmovable,
+		draw: drawHeart,
 		col: setup.endCol,
 		row: setup.endRow
 	})
@@ -820,15 +864,16 @@ function createMap(cols, rows, padCols, padRows) {
 		b = t + rows
 	let offset = 0,
 		checker = 0,
-		checkerAdd = cols % 2 ? 0 : 1
+		checkerAdd = mapCols % 2 ? 0 : 1
 	for (let row = 0; row < mapRows; ++row) {
-		for (let col = 0; col < mapCols; ++col, ++offset) {
+		for (let col = 0; col < mapCols; ++col, ++offset, ++checker) {
+			const odd = checker % 2
 			let tile, trap
 			if (col >= l && col < r && row >= t && row < b) {
-				tile = checker++ % 2 ? TILE_FLOOR1 : TILE_FLOOR2
+				tile = odd ? TILE_FLOOR1 : TILE_FLOOR2
 				trap = FAIL
 			} else {
-				tile = TILE_WALL
+				tile = odd ? TILE_WALL1 : TILE_WALL2
 				trap = 0
 			}
 			map[offset] = tile
@@ -1056,7 +1101,7 @@ function init() {
 
 	gl.enable(gl.BLEND)
 	gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
-	gl.clearColor(.101, .223, .364, 1)
+	gl.clearColor(.372, .152, .039, 1)
 
 	wireInputs()
 	createDust()
