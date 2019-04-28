@@ -530,7 +530,9 @@ function moveBy(e, dc, dr) {
 	const o = offset(col, row),
 		trap = trapMap[o]
 	if (trap) {
-		map[o] = TILE_DANGER
+		if (trap == FAIL) {
+			map[o] = TILE_DANGER
+		}
 		endGame(trap)
 	}
 }
