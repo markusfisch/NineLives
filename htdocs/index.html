@@ -475,8 +475,10 @@ function moveBy(e, dc, dr) {
 	e.vr = dr
 	e.moveUntil = now + moveDuration
 	raiseDustFor(e)
-	const trap = trapMap[offset(col, row)]
+	const o = offset(col, row),
+		trap = trapMap[o]
 	if (trap) {
+		map[o] = TILE_DANGER
 		endGame(trap)
 	}
 }
