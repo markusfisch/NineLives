@@ -541,6 +541,9 @@ function inBtn(bx, by, x, y) {
 
 function processInput() {
 	if (gameOver) {
+		if (keysDown[82]) {
+			W.location.reload(true)
+		}
 		return
 	}
 	let col = 0,
