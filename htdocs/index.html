@@ -660,14 +660,19 @@ function createMapForPath(path) {
 	}
 }
 
-function contains(points, x, y) {
+function invalid(points, x, y) {
+	let neigbors = 0
 	for (let i = 0, l = points.length; i < l; ++i) {
-		const p = points[i]
-		if (p.x == x && p.y == y) {
+		const p = points[i],
+			dx = p.x - x,
+			dy = p.y - y
+		if (dx == 0 && dy == 0) {
 			return true
+		} else if (M.abs(dx) < 2 && M.abs(dy) < 2) {
+			++neigbors
 		}
 	}
-	return false
+	return neigbors > 2
 }
 
 function createPath(len) {
@@ -691,7 +696,7 @@ function createPath(len) {
 			} else {
 				--x
 			}
-		} while (contains(path, x, y))
+		} while (invalid(path, x, y))
 		path.push({
 			x: x,
 			y: y
