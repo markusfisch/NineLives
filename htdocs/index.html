@@ -310,8 +310,7 @@ function raiseDustFor(e) {
 
 function reset() {
 	gameOver = 0
-	createMap()
-	createEntities()
+	createEntities(createMapForPath(createPath(7)))
 }
 
 function resetIfOver() {
@@ -588,19 +587,17 @@ function drawPlayer(x, y) {
 	drawSprite(PLAYER, x, y, this.dir)
 }
 
-function createEntities() {
+function createEntities(start) {
 	entities = []
 
-	let c = M.round(mapCols * .5),
-		r = M.round(mapRows * .5)
 	entities.push(player = {
 		alive: true,
 		draw: drawPlayer,
 		dustUntil: 0,
-		col: c,
-		row: r,
-		colDest: c,
-		rowDest: r,
+		col: start.x,
+		row: start.y,
+		colDest: start.x,
+		rowDest: start.y,
 		vc: 0,
 		vr: 0
 	})
@@ -609,9 +606,8 @@ function createEntities() {
 }
 
 function createMap(cols, rows) {
-	const def = 31
-	mapCols = cols || def
-	mapRows = rows || def
+	mapCols = cols
+	mapRows = rows
 	map = []
 	for (let i = mapCols * mapRows; i--;) {
 		map[i] = i % 2 ? MAP_FLOOR1 : MAP_FLOOR2
@@ -631,6 +627,77 @@ function createMap(cols, rows) {
 		map[x] = MAP_EDGE_LEFT
 		map[x + lc] = MAP_EDGE_RIGHT
 	}
+}
+
+function createMapForPath(path) {
+	let minX = 99999,
+		minY = 99999,
+		maxX = 0,
+		maxY = 0
+	for (let i = 0, l = path.length; i < l; ++i) {
+		const p = path[i]
+		minX = M.min(minX, p.x)
+		minY = M.min(minY, p.y)
+		maxX = M.max(maxX, p.x)
+		maxY = M.max(maxY, p.y)
+	}
+	const w = maxX - minX + 1,
+		h = maxY - minY + 1,
+		minSize = 7,//21,
+		padx = M.max(minSize - w, 0) + 2,
+		pady = M.max(minSize - h, 0) + 2
+	createMap(w + padx, h + pady)
+	const ox = M.floor((mapCols - w) / 2) + M.abs(minX),
+		oy = M.floor((mapRows - h) / 2) + M.abs(minY)
+	for (let i = 0, l = path.length; i < l; ++i) {
+		const p = path[i],
+			o = (oy + p.y) * mapCols + p.x + ox
+		map[o] = 16 + i
+	}
+	return {
+		x: ox,
+		y: oy
+	}
+}
+
+function contains(points, x, y) {
+	for (let i = 0, l = points.length; i < l; ++i) {
+		const p = points[i]
+		if (p.x == x && p.y == y) {
+			return true
+		}
+	}
+	return false
+}
+
+function createPath(len) {
+	const path = [{
+		x: 0,
+		y: 0
+	}]
+	for (let i = 0; i < len; ++i) {
+		const p = path[i]
+		let x, y
+		do {
+			x = p.x
+			y = p.y
+			const r = M.random()
+			if (r < .25) {
+				--y
+			} else if (r < .5) {
+				++y
+			} else if (r < .8) {
+				++x
+			} else {
+				--x
+			}
+		} while (contains(path, x, y))
+		path.push({
+			x: x,
+			y: y
+		})
+	}
+	return path
 }
 
 function createBlood() {
