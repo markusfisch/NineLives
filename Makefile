@@ -7,4 +7,4 @@ all:
 		--times \
 		--compress \
 		htdocs/* \
-		hhsw.de@ssh.strato.de:sites/proto/ld44
+		hhsw.de@ssh.strato.de:sites/proto/NineLives
