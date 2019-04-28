@@ -113,7 +113,8 @@ let atlas,
 	gameOver = 0,
 	gameOverReason = 0,
 	lives = 9,
-	level = { pathLen: 7 },
+	level = {},
+	levelLen = 7,
 	levelNumber = 1,
 	dust = [],
 	dustLength = 100,
@@ -212,6 +213,7 @@ function drawMessage() {
 		drawText(message, messageX, messageY)
 	}
 	drawText("LEVEL " + levelNumber, levelX, levelY)
+}
 
 function drawLives() {
 	let x = lifeX
@@ -420,7 +422,7 @@ function reset() {
 			break
 		case WON:
 			++lives
-			++level.pathLen
+			++levelLen
 			++levelNumber
 			break
 		}
@@ -433,10 +435,10 @@ function reset() {
 	messageUntil = 0
 	gameOver = 0
 	if (newLevel) {
-		level.setup = createMapForPath(createPath(level.pathLen))
-		createEntities(level.setup)
+		level = createMapForPath(createPath(levelLen))
+		createEntities(level)
 	} else {
-		resetEntity(player, level.setup.startCol, level.setup.startRow)
+		resetEntity(player, level.startCol, level.startRow)
 	}
 }
 
