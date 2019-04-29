@@ -914,14 +914,20 @@ function createMapForPath(path) {
 	const ml = M.floor((mapCols - cols) / 2),
 		mt = M.floor((mapRows - rows) / 2),
 		sc = ml + M.abs(minX),
-		sr = mt + M.abs(minY),
-		ec = ml + M.abs(maxX),
-		er = mt + M.abs(maxY)
-	for (let i = 0, l = path.length; i < l; ++i) {
-		const p = path[i]
-		trapMap[offset(sc + p.x, sr + p.y)] = 0
+		sr = mt + M.abs(minY)
+	let ec, er
+	for (let i = 0, last = path.length - 1; i <= last; ++i) {
+		const p = path[i],
+			c = sc + p.x,
+			r = sr + p.y
+		let trap = 0
+		if (i == last) {
+			ec = c
+			er = r
+			trap = WON
+		}
+		trapMap[offset(c, r)] = trap
 	}
-	trapMap[offset(ec, er)] = WON
 	return {
 		startCol: sc,
 		startRow: sr,
