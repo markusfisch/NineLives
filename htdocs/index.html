@@ -365,7 +365,7 @@ function initFrame() {
 }
 
 function spillBlood(col, row, drops) {
-	drops = drops || 6
+	drops = drops || 8
 	let i = bloodLast
 	do {
 		const b = blood[i]
@@ -630,7 +630,7 @@ function processInput() {
 		const pc = player.col,
 			pr = player.row
 		if (peekAt(pc, pr)) {
-			spillBlood(pc, pr)
+			spillBlood(pc, pr, 1)
 			lives -= .5
 			if (lives <= 0) {
 				endGame(FAIL)
