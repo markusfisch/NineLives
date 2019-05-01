@@ -473,7 +473,7 @@ function endGame(reason) {
 	if (reason == FAIL) {
 		player.alive = false
 		spillBlood(player.col, player.row)
-		setMessage("TRY AGAIN")
+		setMessage("OUCH!")
 		ms = 1000
 	} else {
 		raiseDustFor(player)
@@ -490,7 +490,19 @@ function offset(col, row) {
 	return M.round(row) * mapCols + M.round(col)
 }
 
-function addStaticEntity(col, row, draw) {
+function addEntity(col, row, draw, blocks) {
+	entities.push({
+		draw: draw,
+		alive: true,
+		blocks: blocks || false,
+		col: col,
+		row: row
+	})
+	entitiesLength = entities.length
+	return true
+}
+
+function addBlockingEntity(col, row, draw) {
 	col = M.round(col)
 	row = M.round(row)
 	for (let i = 0; i < entitiesLength; ++i) {
@@ -499,15 +511,7 @@ function addStaticEntity(col, row, draw) {
 			return false
 		}
 	}
-	entities.push({
-		draw: draw,
-		alive: true,
-		blocks: true,
-		col: col,
-		row: row
-	})
-	entitiesLength = entities.length
-	return true
+	return addEntity(col, row, draw, true)
 }
 
 function peekAt(col, row) {
@@ -522,7 +526,7 @@ function peekAt(col, row) {
 		const c = p[i++],
 			r = p[i++]
 		if (trapMap[offset(c, r)] == FAIL &&
-				addStaticEntity(c, r, drawDanger)) {
+				addBlockingEntity(c, r, drawDanger)) {
 			raiseDust(c, r)
 			reveal = true
 		}
@@ -582,7 +586,7 @@ function moveBy(e, dc, dr) {
 	const trap = trapMap[offset(col, row)]
 	if (trap) {
 		if (trap == FAIL) {
-			addStaticEntity(col, row, drawBlade)
+			addBlockingEntity(col, row, drawBlade)
 		}
 		endGame(trap)
 	} else {
@@ -876,6 +880,7 @@ function createEntities() {
 		blocks: true,
 		draw: drawPlayer,
 		dustUntil: 0,
+		moveUntil: 0,
 		col: start.x,
 		row: start.y,
 		colDest: start.x,
