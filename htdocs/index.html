@@ -280,7 +280,7 @@ function drawEntities(viewX, viewY) {
 		}
 		const moveUntil = e.moveUntil
 		if (moveUntil > now) {
-			let p = 1 - ((moveUntil - now) / moveDuration)
+			const p = 1 - ((moveUntil - now) / moveDuration)
 			e.col += (e.colDest - e.col) * p
 			e.row += (e.rowDest - e.row) * p
 		}
@@ -414,13 +414,17 @@ function setMessage(text, until) {
 	messageUntil = until || now + 2000
 }
 
-function resetEntity(e, col, row) {
-	e.alive = true
-	e.col = e.colDest = col
-	e.row = e.rowDest = row
-	e.vc = 0
-	e.vr = 0
-	e.dustUntil = 0
+function resetPlayer() {
+	const p = levelPath[0]
+	player = Object.assign(player, {
+		alive: true,
+		colDest: p.x,
+		rowDest: p.y,
+		moveUntil: now + moveDuration,
+		vc: 0,
+		vr: 0,
+		dustUntil: 0
+	})
 }
 
 function reset() {
@@ -453,8 +457,7 @@ function reset() {
 		levelPath = createMapForPath(createPath(levelLen))
 		createEntities()
 	} else {
-		const p = levelPath[0]
-		resetEntity(player, p.x, p.y)
+		resetPlayer()
 	}
 }
 
