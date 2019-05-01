@@ -317,10 +317,10 @@ function drawMap(viewX, viewY) {
 		skip = mapCols - (cr - cl),
 		l = viewX + cl * cellSize,
 		t = viewY - rt * cellSize
-	let offset = rt * mapCols + cl
-	for (let y = t, r = rt; r < rb; y -= cellSize, ++r, offset += skip) {
-		for (let x = l, c = cl; c < cr; x += cellSize, ++c, ++offset) {
-			drawSprite(map[offset], x, y)
+	let o = rt * mapCols + cl
+	for (let y = t, r = rt; r < rb; y -= cellSize, ++r, o += skip) {
+		for (let x = l, c = cl; c < cr; x += cellSize, ++c, ++o) {
+			drawSprite(map[o], x, y)
 		}
 	}
 }
@@ -914,11 +914,11 @@ function createMap(cols, rows, padCols, padRows) {
 		t = M.floor(padRows / 2),
 		r = l + cols,
 		b = t + rows
-	let offset = 0,
+	let o = 0,
 		checker = 0,
 		checkerAdd = mapCols % 2 ? 0 : 1
 	for (let row = 0; row < mapRows; ++row) {
-		for (let col = 0; col < mapCols; ++col, ++offset, ++checker) {
+		for (let col = 0; col < mapCols; ++col, ++o, ++checker) {
 			const odd = checker % 2
 			let tile, trap
 			if (col >= l && col < r && row >= t && row < b) {
@@ -928,8 +928,8 @@ function createMap(cols, rows, padCols, padRows) {
 				tile = odd ? TILE_WALL1 : TILE_WALL2
 				trap = 0
 			}
-			map[offset] = tile
-			trapMap[offset] = trap
+			map[o] = tile
+			trapMap[o] = trap
 		}
 		checker += checkerAdd
 	}
