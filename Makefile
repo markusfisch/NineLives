@@ -1,4 +1,4 @@
-all: premultiply
+all: htdocs/alpha.png
 	rsync \
 		--recursive \
 		--links \
@@ -9,7 +9,7 @@ all: premultiply
 		htdocs/* \
 		hhsw.de@ssh.strato.de:sites/NineLives
 
-premultiply:
+htdocs/alpha.png: gfx/atlas.xcf
 	convert htdocs/atlas.png \( +clone -alpha Extract \) \
 		-channel RGB \
 		-compose Multiply \
