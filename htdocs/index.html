@@ -1159,6 +1159,10 @@ function init() {
 	W.onresize = resize
 	resize()
 
+	if (!showTouchControls) {
+		setMessage("SPACEBAR TO PEEK FOR TRAPS", Date.now() + 2000)
+	}
+
 	run()
 }
 
