@@ -124,7 +124,7 @@ let atlas,
 	gameOverReason = 0,
 	seed = M.PI,
 	lives = 9,
-	level = {},
+	levelPath = {},
 	levelLen = 7,
 	levelNumber = 1,
 	dust = [],
@@ -434,7 +434,6 @@ function reset() {
 			newLevel = false
 			break
 		case WON:
-			++lives
 			++levelLen
 			++levelNumber
 			break
@@ -451,10 +450,11 @@ function reset() {
 	messageUntil = 0
 	gameOver = 0
 	if (newLevel) {
-		level = createMapForPath(createPath(levelLen))
-		createEntities(level)
+		levelPath = createMapForPath(createPath(levelLen))
+		createEntities()
 	} else {
-		resetEntity(player, level.startCol, level.startRow)
+		const p = levelPath[0]
+		resetEntity(player, p.x, p.y)
 	}
 }
 
@@ -475,6 +475,8 @@ function endGame(reason) {
 		spillBlood(player.col, player.row)
 		setMessage("TRY AGAIN")
 		ms = 1000
+	} else {
+		raiseDustFor(player)
 	}
 	shake()
 	gameOver = now
@@ -528,6 +530,19 @@ function peekAt(col, row) {
 	return reveal
 }
 
+function consumeAt(entity, col, row) {
+	for (let i = entitiesLength; i-- > 0;) {
+		const e = entities[i]
+		if (e === entity || e.blocks || !e.alive || !e.consume) {
+			continue
+		}
+		if (M.floor(e.col) == M.floor(col) &&
+				M.floor(e.row) == M.floor(row)) {
+			e.consume(entity)
+		}
+	}
+}
+
 function canMoveTo(entity, col, row) {
 	if (col < 0 || col >= mapCols - 1 ||
 			row < 0 || row >= mapRows - 1) {
@@ -535,13 +550,11 @@ function canMoveTo(entity, col, row) {
 	}
 	for (let i = entitiesLength; i-- > 0;) {
 		const e = entities[i]
-		if (e === entity || !e.blocks) {
+		if (e === entity || !e.blocks || !e.alive) {
 			continue
 		}
-		const dc = e.col - col,
-			dr = e.row - row,
-			d = dc*dc + dr*dr
-		if (d < .5) {
+		if (M.floor(e.col) == M.floor(col) &&
+				M.floor(e.row) == M.floor(row)) {
 			return false
 		}
 	}
@@ -560,18 +573,20 @@ function moveBy(e, dc, dr) {
 	if (!canMoveTo(e, col, row)) {
 		return
 	}
+	consumeAt(e, col, row)
 	e.colDest = col
 	e.rowDest = row
 	e.vc = dc
 	e.vr = dr
 	e.moveUntil = now + moveDuration
-	raiseDustFor(e)
 	const trap = trapMap[offset(col, row)]
 	if (trap) {
 		if (trap == FAIL) {
 			addStaticEntity(col, row, drawBlade)
 		}
 		endGame(trap)
+	} else {
+		raiseDustFor(e)
 	}
 }
 
@@ -833,29 +848,54 @@ function drawPlayer(x, y) {
 	)
 }
 
-function createEntities(setup) {
+function addExtraLive() {
+	shake()
+	++lives
+}
+
+function createHeart(col, row) {
+	return {
+		alive: true,
+		blocks: false,
+		draw: drawHeart,
+		col: col,
+		row: row,
+		consume: function() {
+			addExtraLive()
+			this.alive = false
+		}
+	}
+}
+
+function createEntities() {
 	entities = []
 
+	const start = levelPath[0]
 	entities.push(player = {
 		alive: true,
 		blocks: true,
 		draw: drawPlayer,
 		dustUntil: 0,
-		col: setup.startCol,
-		row: setup.startRow,
-		colDest: setup.startCol,
-		rowDest: setup.startRow,
+		col: start.x,
+		row: start.y,
+		colDest: start.x,
+		rowDest: start.y,
 		vc: 0,
 		vr: 0
 	})
 
-	entities.push({
-		alive: true,
-		blocks: false,
-		draw: drawHeart,
-		col: setup.endCol,
-		row: setup.endRow
-	})
+	const pathLen = levelPath.length,
+		last = pathLen - 1
+	if (pathLen > 9) {
+		const step = M.round(pathLen / (1 + M.floor(pathLen / 7)))
+		for (let i = step; i < last; i += step) {
+			const p = levelPath[i]
+			entities.push(createHeart(p.x, p.y))
+		}
+	}
+
+	const end = levelPath[last]
+	entities.push(createHeart(end.x, end.y))
 
 	entitiesLength = entities.length
 }
@@ -891,11 +931,12 @@ function createMap(cols, rows, padCols, padRows) {
 }
 
 function createMapForPath(path) {
-	let minX = 99999,
+	let len = path.length,
+		minX = 99999,
 		minY = 99999,
 		maxX = 0,
 		maxY = 0
-	for (let i = 0, l = path.length; i < l; ++i) {
+	for (let i = 0; i < len; ++i) {
 		const p = path[i]
 		minX = M.min(minX, p.x)
 		minY = M.min(minY, p.y)
@@ -904,7 +945,7 @@ function createMapForPath(path) {
 	}
 	const cols = maxX - minX + 1,
 		rows = maxY - minY + 1,
-		minSize = 21
+		minSize = 25
 	createMap(
 		cols,
 		rows,
@@ -914,26 +955,15 @@ function createMapForPath(path) {
 	const ml = M.floor((mapCols - cols) / 2),
 		mt = M.floor((mapRows - rows) / 2),
 		sc = ml + M.abs(minX),
-		sr = mt + M.abs(minY)
-	let ec, er
-	for (let i = 0, last = path.length - 1; i <= last; ++i) {
-		const p = path[i],
-			c = sc + p.x,
-			r = sr + p.y
-		let trap = 0
-		if (i == last) {
-			ec = c
-			er = r
-			trap = WON
-		}
-		trapMap[offset(c, r)] = trap
+		sr = mt + M.abs(minY),
+		last = len - 1
+	for (let i = 0; i < len; ++i) {
+		const p = path[i]
+		p.x += sc
+		p.y += sr
+		trapMap[offset(p.x, p.y)] = i == last ? WON : 0
 	}
-	return {
-		startCol: sc,
-		startRow: sr,
-		endCol: ec,
-		endRow: er
-	}
+	return path
 }
 
 function invalid(points, x, y) {
