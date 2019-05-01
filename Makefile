@@ -7,7 +7,7 @@ all: premultiply
 		--times \
 		--compress \
 		htdocs/* \
-		hhsw.de@ssh.strato.de:sites/proto/NineLives
+		hhsw.de@ssh.strato.de:sites/NineLives
 
 premultiply:
 	convert htdocs/atlas.png \( +clone -alpha Extract \) \
