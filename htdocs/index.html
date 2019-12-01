@@ -41,11 +41,11 @@ attribute vec2 uv;
 uniform mat3 perspective;
 uniform mat3 transformation;
 
-varying vec2 vuv;
+varying vec2 st;
 
 void main() {
 	gl_Position = vec4(perspective * transformation * vec3(p, 1.), 1.);
-	vuv = uv;
+	st = uv;
 }
 </script>
 <script id="FragmentShader" type="x-shader/x-fragment">
@@ -55,12 +55,12 @@ precision highp float;
 precision mediump float;
 #endif
 
-varying vec2 vuv;
+varying vec2 st;
 
 uniform sampler2D texture;
 
 void main() {
-	gl_FragColor = texture2D(texture, vuv.st).rgba;
+	gl_FragColor = texture2D(texture, st);
 }
 </script>
 <script>
